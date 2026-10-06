@@ -1,4 +1,5 @@
 import { AlertPayload, Env } from './types';
+import { SYSTEM_TOPICS } from './config';
 
 const quietHoursFormatterCache = new Map<string, Intl.DateTimeFormat>();
 
@@ -65,19 +66,22 @@ export function shouldBeSilent(
   env: Env,
   date = new Date()
 ): boolean {
-  // 1. Unverified requests are strictly silent
-  if (!isVerified) {
+  // 1. Explicit override
+  if (typeof payload.silent === 'boolean') {
+    return payload.silent;
+  }
+
+  // 2. Unverified requests: strictly silent (except inbox which follows normal delivery rules)
+  const isInbox =
+    typeof payload.topic === 'string' &&
+    (payload.topic.toLowerCase() === 'inbox' || payload.topic.toLowerCase() === SYSTEM_TOPICS.INBOX);
+  if (!isVerified && !isInbox) {
     return true;
   }
 
-  // 2. Catch-all payloads are silent by default
+  // 3. Catch-all payloads are silent by default
   if (payload.is_catchall) {
     return payload.silent ?? true;
-  }
-
-  // 3. Explicit override
-  if (typeof payload.silent === 'boolean') {
-    return payload.silent;
   }
 
   // 4. Quiet hours check

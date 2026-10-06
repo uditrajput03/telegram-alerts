@@ -1,4 +1,5 @@
 import { AlertPayload } from './types';
+import { SYSTEM_TOPICS } from './config';
 
 export const SEPARATOR = '───────────────';
 const SPOILER_THRESHOLD = 500;
@@ -239,7 +240,10 @@ export function formatTelegramMessage(
   }
 
   // ─── B. Standard Message ───
-  if (!isVerified) {
+  const isInbox =
+    typeof payload.topic === 'string' &&
+    (payload.topic.toLowerCase() === 'inbox' || payload.topic.toLowerCase() === SYSTEM_TOPICS.INBOX);
+  if (!isVerified && !isInbox) {
     parts.push('<blockquote>🔓 <b>Unverified Source</b></blockquote>');
   }
 

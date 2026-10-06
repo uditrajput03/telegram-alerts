@@ -35,7 +35,14 @@ export async function resolveTopicId(
     return await getOrCreateTopic(SYSTEM_TOPICS.CATCHALL, env.CATCHALL_TOPIC_ID, env, botToken, chatId);
   }
 
-  // 2. Unauthenticated standard requests -> strictly routed to 'unknown' topic (SEC-03 fix: cannot override topic_id)
+  // 2. Inbox topic requests -> strictly delivered to 'inbox' topic whether authenticated or not
+  const rawTopic = payload.topic;
+  const topicName = typeof rawTopic === 'string' ? rawTopic.trim().toLowerCase() : '';
+  if (topicName === SYSTEM_TOPICS.INBOX || topicName === 'inbox') {
+    return await getOrCreateTopic(SYSTEM_TOPICS.INBOX, env.INBOX_TOPIC_ID, env, botToken, chatId);
+  }
+
+  // 3. Unauthenticated standard requests -> strictly routed to 'unknown' topic (SEC-03 fix: cannot override topic_id)
   if (!isVerified) {
     return await getOrCreateTopic(SYSTEM_TOPICS.UNKNOWN, env.UNKNOWN_TOPIC_ID, env, botToken, chatId);
   }
@@ -49,16 +56,13 @@ export async function resolveTopicId(
     }
   }
 
-  // 4. Extract string topic name
-  const rawTopic = payload.topic;
+  // 4. Numeric string topic name (e.g. topic "123")
   if (typeof rawTopic === 'string' && /^\d+$/.test(rawTopic.trim())) {
     const parsed = parseInt(rawTopic.trim(), 10);
     if (parsed > 0) {
       return { topicId: parsed, topicName: `topic-${parsed}` };
     }
   }
-
-  const topicName = typeof rawTopic === 'string' ? rawTopic.trim().toLowerCase() : '';
 
   // 5. No topic specified -> default to General (null thread ID)
   if (!topicName || topicName === SYSTEM_TOPICS.GENERAL) {

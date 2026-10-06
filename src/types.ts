@@ -12,6 +12,7 @@ export interface Env {
   // Optional Environment Overrides for System Topics
   UNKNOWN_TOPIC_ID?: string;  // Predefined topic ID for unauthenticated messages
   CATCHALL_TOPIC_ID?: string; // Predefined topic ID for raw / structural recovery messages
+  INBOX_TOPIC_ID?: string;    // Predefined topic ID for inbox messages
 
   // Optional Quiet Hours (Disabled by default)
   QUIET_HOURS_START?: string;

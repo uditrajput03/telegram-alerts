@@ -216,6 +216,9 @@ async function handleNotification(c: Context<{ Bindings: Env }>): Promise<Respon
 
   // Reject empty payloads / scanner probes to prevent Telegram notification spam
   if (!hasContent) {
+    if (c.req.path === '/send' && c.req.header('accept')?.includes('text/html') && !c.req.header('accept')?.includes('application/json')) {
+      return c.html(renderSendPage({ error: 'Missing content: message is required.' }), 400);
+    }
     return c.json<GatewayResponse>(
       {
         success: false,
@@ -461,7 +464,7 @@ async function parseRequestPayload(c: Context<{ Bindings: Env }>, isVerified = f
         return {
           message: message.trim(),
           title: body.title || pathTitle,
-          topic: body.topic ?? body.category ?? c.req.query('topic') ?? pathTopic ?? (isSendPath ? 'inbox' : undefined),
+          topic: isSendPath ? 'inbox' : (body.topic ?? body.category ?? c.req.query('topic') ?? pathTopic),
           silent: parseBoolean(body.silent),
           topic_id: body.topic_id ?? c.req.query('topic_id'),
           raw_path: isCustomPath ? path : undefined,
@@ -499,8 +502,18 @@ async function parseRequestPayload(c: Context<{ Bindings: Env }>, isVerified = f
         raw_query: Object.keys(queryObj).length > 0 ? queryObj : undefined,
       };
     } catch {
-      // If rawBody is empty or whitespace, check if custom path had message
+      // If rawBody is empty or whitespace, check if query param or custom path had message
       if (!rawBody || rawBody.trim() === '' || rawBody.trim() === '{}') {
+        const queryMsg = c.req.query('message') || c.req.query('m');
+        if (queryMsg) {
+          return {
+            message: queryMsg,
+            title: c.req.query('title') || c.req.query('t') || pathTitle,
+            topic: isSendPath ? 'inbox' : (c.req.query('topic') || pathTopic),
+            silent: parseBoolean(c.req.query('silent')),
+            topic_id: c.req.query('topic_id'),
+          };
+        }
         if (pathMessage) {
           return {
             is_catchall: true,
@@ -535,22 +548,20 @@ async function parseRequestPayload(c: Context<{ Bindings: Env }>, isVerified = f
       const formData = await c.req.parseBody();
       const message = String(formData.message || formData.text || '');
 
-      if (message.trim() !== '') {
-        return {
-          message: message.trim(),
-          title: formData.title ? String(formData.title) : pathTitle,
-          topic: (formData.topic || formData.category) ? String(formData.topic || formData.category) : (c.req.query('topic') || pathTopic || (isSendPath ? 'inbox' : undefined)),
-          silent: parseBoolean(formData.silent),
-          topic_id: formData.topic_id ? String(formData.topic_id) : undefined,
-          raw_path: isCustomPath ? path : undefined,
-        };
-      }
+      return {
+        message: message.trim(),
+        title: formData.title ? String(formData.title) : pathTitle,
+        topic: isSendPath ? 'inbox' : ((formData.topic || formData.category) ? String(formData.topic || formData.category) : (c.req.query('topic') || pathTopic)),
+        silent: parseBoolean(formData.silent),
+        topic_id: formData.topic_id ? String(formData.topic_id) : undefined,
+        raw_path: isCustomPath ? path : undefined,
+      };
     } catch {}
   }
 
   // Raw body / CLI pipe handling
   if (rawBody && rawBody.trim() !== '') {
-    const explicitTopic = c.req.query('topic') || c.req.query('category') || c.req.query('c') || pathTopic || (isSendPath ? 'inbox' : undefined);
+    const explicitTopic = isSendPath ? 'inbox' : (c.req.query('topic') || c.req.query('category') || c.req.query('c') || pathTopic);
     const explicitTitle = c.req.query('title') || c.req.query('t') || pathTitle;
 
     // If caller specified a topic or title, treat rawBody as the message
@@ -588,9 +599,20 @@ async function parseRequestPayload(c: Context<{ Bindings: Env }>, isVerified = f
     };
   }
 
+  const queryMsg = c.req.query('message') || c.req.query('m');
+  if (queryMsg) {
+    return {
+      message: queryMsg,
+      title: c.req.query('title') || c.req.query('t') || pathTitle,
+      topic: isSendPath ? 'inbox' : (c.req.query('topic') || pathTopic),
+      silent: parseBoolean(c.req.query('silent')),
+      topic_id: c.req.query('topic_id'),
+    };
+  }
+
   return {
     message: '',
-    topic: 'general',
+    topic: isSendPath ? 'inbox' : 'general',
     raw_query: Object.keys(queryObj).length > 0 ? queryObj : undefined,
   };
 }

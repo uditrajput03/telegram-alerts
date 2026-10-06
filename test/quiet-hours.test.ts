@@ -41,6 +41,15 @@ describe('Quiet Hours & Silence Evaluation', () => {
     expect(silent).toBe(true);
   });
 
+  it('does not force silence for unverified inbox alerts', () => {
+    const silent = shouldBeSilent(
+      { message: 'Test message', topic: 'inbox' },
+      false, // unverified
+      baseEnv
+    );
+    expect(silent).toBe(false);
+  });
+
   it('defaults catchall recovery payloads to silent', () => {
     const silent = shouldBeSilent(
       { is_catchall: true, raw_body: 'something' },

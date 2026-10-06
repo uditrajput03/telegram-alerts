@@ -94,6 +94,20 @@ describe('Message Formatter', () => {
     expect(result).toContain(SEPARATOR);
   });
 
+  it('omits unverified badge for inbox topic even when isVerified is false', () => {
+    const result = formatTelegramMessage(
+      {
+        message: 'Quick note for inbox',
+        topic: 'inbox',
+      },
+      false
+    );
+
+    expect(result).not.toContain('Unverified Source');
+    expect(result).toContain('Quick note for inbox');
+    expect(result).toContain('#inbox');
+  });
+
   it('formats verified message with priority emoji and separator', () => {
     const result = formatTelegramMessage(
       {

@@ -17,6 +17,7 @@ export const SYSTEM_TOPICS = {
   UNKNOWN: 'unknown',   // Messages sent without authentication
   CATCHALL: 'catchall', // Raw / malformed / structural recovery messages
   GENERAL: 'general',   // Default fallback (main thread)
+  INBOX: 'inbox',       // Dedicated inbox topic
 } as const;
 
 /**
@@ -52,6 +53,7 @@ export function formatTopicTitle(topicName: string): string {
   const clean = topicName.trim().toLowerCase();
   if (clean === SYSTEM_TOPICS.UNKNOWN) return '⚠️ Unknown (No Auth)';
   if (clean === SYSTEM_TOPICS.CATCHALL) return '📦 Catch-All (Raw Payloads)';
+  if (clean === SYSTEM_TOPICS.INBOX) return 'Inbox';
 
   // Capitalize word
   return clean.charAt(0).toUpperCase() + clean.slice(1);

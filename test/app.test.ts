@@ -1088,6 +1088,125 @@ describe('Gateway HTTP API (Hono app)', () => {
       const html = await res.text();
       expect(html).toContain('Sent to #inbox!');
     });
+
+    it('POST /send without authentication ALWAYS delivers to inbox topic and omits unverified badge', async () => {
+      let capturedBody: any;
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any, init: any) => {
+        const urlStr = String(url);
+        if (urlStr.includes('/sendMessage')) {
+          capturedBody = JSON.parse(init.body);
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              result: { message_id: 890, message_thread_id: 333, chat: { id: -1001234567890 } },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (urlStr.includes('/createForumTopic')) {
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              result: { message_thread_id: 333, name: 'Inbox', icon_color: 0x6FB9F0 },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response('{}', { status: 200 });
+      });
+
+      // No x-api-key header! Totally unauthenticated!
+      const res = await app.request(
+        '/send',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: 'Unauthenticated note to inbox',
+          }),
+        },
+        mockEnv
+      );
+
+      expect(res.status).toBe(200);
+      const data = await res.json() as any;
+      expect(data.success).toBe(true);
+      expect(data.is_verified).toBe(false);
+      expect(data.topic).toBe('inbox');
+      expect(data.topic_id).toBe(333);
+      expect(data.silent).toBe(false);
+      expect(capturedBody).toBeDefined();
+      expect(capturedBody.message_thread_id).toBe(333);
+      expect(capturedBody.text).toContain('Unauthenticated note to inbox');
+      // Must NOT contain the unverified source badge
+      expect(capturedBody.text).not.toContain('Unverified Source');
+    });
+
+    it('POST /send with query message and empty body delivers to inbox', async () => {
+      let capturedThreadId: number | null = null;
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any, init: any) => {
+        const urlStr = String(url);
+        if (urlStr.includes('/sendMessage')) {
+          const body = JSON.parse(init.body);
+          capturedThreadId = body.message_thread_id ?? null;
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              result: { message_id: 891, message_thread_id: 333, chat: { id: -1001234567890 } },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (urlStr.includes('/createForumTopic')) {
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              result: { message_thread_id: 333, name: 'Inbox', icon_color: 0x6FB9F0 },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response('{}', { status: 200 });
+      });
+
+      const res = await app.request(
+        '/send?message=Query+Note',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '',
+        },
+        mockEnv
+      );
+
+      expect(res.status).toBe(200);
+      const data = await res.json() as any;
+      expect(data.success).toBe(true);
+      expect(data.topic).toBe('inbox');
+      expect(capturedThreadId).toBe(333);
+    });
+
+    it('POST /send with empty message and HTML accept returns 400 HTML with error', async () => {
+      const res = await app.request(
+        '/send',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'text/html',
+          },
+          body: 'message=',
+        },
+        mockEnv
+      );
+
+      expect(res.status).toBe(400);
+      expect(res.headers.get('content-type')).toContain('text/html');
+      const html = await res.text();
+      expect(html).toContain('Missing content');
+    });
   });
 
   it('safely handles literal percent signs in URI path without crashing', async () => {
