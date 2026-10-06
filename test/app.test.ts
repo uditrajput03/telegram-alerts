@@ -955,6 +955,48 @@ describe('Gateway HTTP API (Hono app)', () => {
     expect(capturedBody.text).toContain('Test Notification Dispatched');
   });
 
+  it('handles /docs command via telegram webhook', async () => {
+    let capturedReply = '';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: any, init: any) => {
+      capturedReply = init.body;
+      return new Response(
+        JSON.stringify({ ok: true, result: { message_id: 304 } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    const res = await app.request(
+      '/telegram-webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-telegram-bot-api-secret-token': 'test-webhook-secret',
+        },
+        body: JSON.stringify({
+          update_id: 5,
+          message: {
+            message_id: 55,
+            from: { id: 12345, is_bot: false, first_name: 'User' },
+            chat: { id: -1001234567890, type: 'supergroup' },
+            date: 1234570,
+            text: '/docs',
+          },
+        }),
+      },
+      {
+        ...mockEnv,
+        TELEGRAM_WEBHOOK_SECRET: 'test-webhook-secret',
+      }
+    );
+
+    expect(res.status).toBe(200);
+    expect(capturedReply).toContain('API &amp; Webhook Documentation');
+    expect(capturedReply).toContain('/notify');
+    expect(capturedReply).toContain('curl');
+    expect(capturedReply).toContain('message');
+  });
+
   describe('/send route (inbox topic)', () => {
     it('GET /send returns 200 with minimal HTML form', async () => {
       const res = await app.request('/send', {}, mockEnv);

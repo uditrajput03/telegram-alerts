@@ -93,8 +93,56 @@ export async function handleTelegramWebhook(
       '',
       SEPARATOR,
       '💡 <code>/help</code> — Show this menu',
+      '📖 <code>/docs</code> — Webhook &amp; payload guide',
     ].join('\n');
     await reply(helpText);
+    return;
+  }
+
+  // 3. API & Webhook documentation command
+  if (command === '/docs' || command === '/api' || command === '/payload') {
+    const docsText = [
+      '📖 <b>API &amp; Webhook Documentation</b>',
+      SEPARATOR,
+      '',
+      '<b>1. Standard JSON Alert (POST /notify)</b>',
+      `<code>curl -X POST "https://${gatewayHost}/notify" \\`,
+      `  -H "Content-Type: application/json" \\`,
+      `  -H "x-api-key: &lt;TOKEN&gt;" \\`,
+      `  -d '{`,
+      `    "title": "Deploy Notice",`,
+      `    "message": "Production build v1.4 complete",`,
+      `    "topic": "deploy",`,
+      `    "silent": false`,
+      `  }'</code>`,
+      '',
+      '<b>2. Quick Send to Inbox (/send)</b>',
+      `Web interface: <code>https://${gatewayHost}/send</code>`,
+      `CLI: <code>curl -d "message=Hello" "https://${gatewayHost}/send?token=&lt;TOKEN&gt;"</code>`,
+      '',
+      '<b>3. URL Subpath Shortcuts</b>',
+      `<code>curl "https://${gatewayHost}/notify/Deploy/Build+passed?token=&lt;TOKEN&gt;"</code>`,
+      '',
+      '<b>4. Piping Terminal Logs</b>',
+      `<code>echo "Backup complete" | curl -X POST \\`,
+      `  "https://${gatewayHost}/notify?topic=backups&amp;title=Cron" \\`,
+      `  -H "x-api-key: &lt;TOKEN&gt;" --data-binary @-</code>`,
+      '',
+      '<b>5. Payload Fields Reference</b>',
+      '  · <code>message</code> <i>(string, required)</i>: Markdown or plain text body',
+      '  · <code>title</code> <i>(string, optional)</i>: Alert header',
+      '  · <code>topic</code> <i>(string|number, optional)</i>: Destination topic name or thread ID',
+      '  · <code>silent</code> <i>(boolean, optional)</i>: Mute notification sound',
+      '',
+      '<b>6. Authentication</b>',
+      '  · Header: <code>x-api-key: &lt;TOKEN&gt;</code> or <code>Authorization: Bearer &lt;TOKEN&gt;</code>',
+      '  · Query: <code>?token=&lt;TOKEN&gt;</code>',
+      '  · Create tokens: <code>/token ephemeral 24h [label]</code>',
+      '',
+      SEPARATOR,
+      '💡 <i>Unstructured or third-party webhooks route to <code>#catchall</code>.</i>',
+    ].join('\n');
+    await reply(docsText);
     return;
   }
 

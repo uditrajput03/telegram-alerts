@@ -223,6 +223,7 @@ Once the webhook is registered, you can manage the gateway directly inside Teleg
 | Command | Description | Example |
 |---|---|---|
 | `/help` or `/start` | Displays interactive help menu with all commands | `/help` |
+| `/docs` or `/api` | Interactive API and webhook payload usage documentation | `/docs` |
 | `/id` | Diagnostic info: chat ID, user ID, current topic ID | `/id` |
 | `/status` or `/health` | Gateway operational health, mapped topics, and tokens | `/status` |
 | `/mute [topic] [duration]` | Mutes alerts for a topic in KV (e.g. 1h, 4h, 24h, 7d) | `/mute deploy 2h` |
