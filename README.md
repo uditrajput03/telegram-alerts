@@ -1,137 +1,174 @@
-# 📡 Personal Notification Gateway (Cloudflare Workers + Telegram Topics)
+# Telegram notification gateway
 
-A clean, serverless notification gateway running on **Cloudflare Workers (TypeScript)** and **Hono**. It receives alerts from scripts, servers, webhooks, and CLI commands, dynamically creating and organizing them into **Telegram Supergroup Forum Topics**.
+A serverless gateway running on Cloudflare Workers and Hono. It accepts alerts from scripts, servers, webhooks, and command line tools, and routes them into Telegram supergroup forum topics.
 
----
+## Features
 
-## 🎯 Architecture: 3 System Topics + 100% Dynamic Topics
+* **Dynamic forum topics.** Pass a topic name in your request. The gateway checks Cloudflare KV for the topic thread, creates the topic on Telegram if it does not exist, and caches the thread ID. If a topic is deleted in Telegram, the gateway recreates it automatically.
+* **Web composer.** Visiting `/send` in your browser opens a clean form that delivers messages directly to the `#inbox` topic.
+* **Token management in chat.** Create permanent or expiring API tokens directly inside Telegram with `/token`.
+* **Topic muting and quiet hours.** Silence alerts during night hours via configuration, or temporarily mute specific topics with `/mute`.
+* **Markdown and collapsible quotes.** Formats markdown into Telegram HTML, collapses long error traces into expandable blockquotes, and balances HTML tags during truncation.
+* **Payload recovery.** Requests with unrecognized structures or third-party webhook payloads land safely in a catchall topic instead of being dropped.
 
-All cluttered static categories (like critical, dev, sales) have been removed. Instead, the gateway relies on a simple, robust topic model:
+## Prerequisites
 
-### 1. System Topics
-| Topic | Purpose | Behavior |
-|---|---|---|
-| `unknown` | **Unauthenticated Requests** | Catches messages sent without auth. Tagged with `🔓 Unverified Source`, strictly quarantined, and delivered silently. |
-| `catchall` | **Raw / Structural Recovery** | If someone sends unformatted raw text, malformed JSON, or third-party webhooks without a `message` field, the entire payload is safely recovered and formatted inside a code block. **Messages are never dropped.** |
-| `general` | **Default / Fallback** | Default main chat thread when no topic is specified or as ultimate fallback. |
+1. A Telegram bot token from `@BotFather`.
+2. A Telegram supergroup with forum topics enabled. Add your bot to the group as an administrator with rights to manage topics.
+3. Node.js 20 or higher.
+4. A Cloudflare account with Wrangler CLI.
 
-### 2. 100% Dynamic Topics & Self-Healing
-- **Auto-Created On Demand**: Any named topic (e.g. `topic: "database"`, `topic: "stripe"`, `topic: "deployments"`) is created automatically:
-  1. The gateway checks Cloudflare KV for the topic.
-  2. If not found, it calls Telegram's `createForumTopic` API to **dynamically create the topic** in your supergroup.
-  3. It caches the thread ID in KV so all future alerts go straight to that topic.
-- **🔄 Instant Self-Healing**: If you ever delete or close a forum topic in Telegram, the gateway detects the missing thread error, **automatically purges the stale KV cache, recreates the topic on the fly in Telegram**, and delivers the message directly to the new topic. **Messages never leak into the General chat.**
-- **Direct Numeric IDs**: You can also pass direct numeric topic IDs: `topic: 42`.
+## Setup and deployment
 
----
+### 1. Clone repository and install dependencies
 
-## 🎨 Clean Card Layout & Smart Features
-
-- **Contextual Priority Emojis**: Automatically scans title and message text to prefix the alert with intuitive status indicators:
-  - 🔴 Error / Panic / Outage / Crash / Broken
-  - 🟠 Warning / Caution / Degraded / Timeout
-  - 🟢 Success / Resolved / Fixed / Restored
-  - 🚀 Build / Deploy / Pipeline / Ship
-  - 🛡️ Security / Auth / Unauthorized
-  - 🗄️ Database / Migration / Backup
-  - 🔵 Info / Notice / Changelog
-  - 💳 Payment / Billing / Subscription
-  - 🧪 Testing / CI / Lint
-- **Markdown & Telegram HTML**: Full support for markdown `**bold**`, `_italic_`, `~~strike~~`, `||spoiler||`, expandable blockquotes (`**>` or `>>` or quotes > 3 lines), inline `` `code` ``, syntax-highlighted ```` ```pre blocks``` ````, blockquotes (`>`), and links (`[label](url)`).
-- **Expandable Blockquotes**: Collapse long stack traces, logs, or multi-line quotes into a single line with an inline expand toggle using `**>` or `>>`, keeping topic threads clean.
-- **Tap-to-Reveal Spoilers**: Large catch-all dumps or payload bodies exceeding 500 characters are automatically wrapped in `<tg-spoiler>` so topics stay readable without wall-of-text spam.
-- **🌙 Configurable Quiet Hours**: Set `QUIET_HOURS_START`, `QUIET_HOURS_END`, and `TIMEZONE` in `wrangler.toml` (e.g. 23:00 to 07:00). Alerts arriving during these hours are automatically silenced (`disable_notification: true`). Unverified and catch-all alerts are always muted.
-
----
-
-## 🔒 Security Hardening
-
-- 🔐 **Strict Webhook Authentication (SEC-01)**: `TELEGRAM_WEBHOOK_SECRET` is strictly mandatory for bot commands. Any webhook update missing Telegram's secret token header (`x-telegram-bot-api-secret-token`) is immediately rejected with `401 Unauthorized`. Unconfigured servers reject all webhook calls, completely preventing spoofing attacks.
-- 🛡️ **Protected Setup Endpoint (SEC-05)**: `/setup-webhook` requires static master `AUTH_TOKEN` verification, preventing unauthorized internet scans from triggering or reconfiguring your bot's webhook.
-- 🛡️ **Topic Quarantine (SEC-03)**: Unauthenticated requests cannot bypass quarantine using `topic_id` or custom topics—they are strictly isolated to the `#unknown` topic.
-- 🚫 **Probe & Scanner Rejection (SEC-04)**: Empty payloads (`{}`), blank requests, or automated internet port scanners are rejected with `400 Bad Request` and never trigger notification spam.
-- 🛡️ **Tag-Balanced HTML Truncation (SEC-06)**: Long logs or raw webhook dumps are truncated safely while auto-closing HTML tags (`</code></pre>`, `</b>`, `</i>`), preventing Telegram `400 Bad Request: can't parse entities` delivery failures.
-- 🔑 **Isolated KV Keys**: Dynamic topics are stored per-topic in Cloudflare KV without shared mutable bottlenecks.
-
----
-
-## 📡 API Usage & curl Snippets
-
-### 1. Dynamic Topic Alert (Auto-Creates Topic)
 ```bash
-curl -X POST "https://<WORKER_URL>/notify" \
+git clone https://github.com/uditrajput03/telegram-alerts.git
+cd telegram-alerts
+npm install
+```
+
+### 2. Create the Cloudflare KV namespace
+
+Create the production and preview namespaces:
+
+```bash
+npx wrangler kv namespace create GATEWAY_KV
+npx wrangler kv namespace create GATEWAY_KV --preview
+```
+
+Copy `wrangler.toml.example` to `wrangler.toml`:
+
+```bash
+cp wrangler.toml.example wrangler.toml
+```
+
+Paste the namespace IDs from the command output into `wrangler.toml`:
+
+```toml
+[[kv_namespaces]]
+binding = "GATEWAY_KV"
+id = "your_production_kv_id"
+preview_id = "your_preview_kv_id"
+```
+
+### 3. Configure secrets
+
+Run the following commands to store your credentials securely:
+
+```bash
+# Telegram bot token from @BotFather
+npx wrangler secret put TELEGRAM_BOT_TOKEN
+
+# Supergroup chat ID, for example -1001234567890
+npx wrangler secret put TELEGRAM_CHAT_ID
+
+# Master static token for authenticating API calls
+npx wrangler secret put AUTH_TOKEN
+
+# Secret token for Telegram webhook requests
+# Generate any random string, for example using openssl rand -hex 24
+npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
+```
+
+#### How to find your chat ID
+
+If you do not know your supergroup chat ID, deploy the worker first, add your bot to the group, and send `/id` in the group chat. The bot will print the numeric chat ID.
+
+### 4. Deploy to Cloudflare Workers
+
+```bash
+npm run deploy
+```
+
+Take note of the deployment URL printed by Wrangler, for example `https://telegram-alerts.<your-subdomain>.workers.dev`.
+
+### 5. Register the Telegram webhook
+
+Register your webhook endpoint with Telegram so the bot can receive commands:
+
+```bash
+curl "https://<YOUR_WORKER_URL>/setup-webhook?token=<AUTH_TOKEN>"
+```
+
+The gateway confirms registration and applies your webhook secret. Telegram attaches this secret to every update, and requests without the secret are rejected.
+
+## Sending alerts
+
+### Web interface
+
+Visit `https://<YOUR_WORKER_URL>/send` in any browser.
+
+The page provides a message field, optional title and token inputs, keyboard shortcuts with Cmd+Enter, and saves your token locally so you do not need to retype it. All messages from this page route to the `inbox` topic.
+
+### JSON payload
+
+```bash
+curl -X POST "https://<YOUR_WORKER_URL>/notify" \
   -H "Content-Type: application/json" \
   -H "x-api-key: <AUTH_TOKEN>" \
   -d '{
     "title": "Postgres Migration",
-    "message": "Migration `2026_10_07_add_users` applied in **1.2s**.",
+    "message": "Migration complete in 1.2s",
     "topic": "database"
   }'
 ```
 
-### 2. URL Path Shortcuts
-You can also trigger notifications directly via URL subpaths:
-```bash
-# Simple ping message
-curl "https://<WORKER_URL>/notify/Server+Online?token=<AUTH_TOKEN>"
+### URL path shortcut
 
-# Title and Message via path segments: /notify/<title>/<message>
-curl "https://<WORKER_URL>/notify/Deploy/Production+build+v1.4+complete?token=<AUTH_TOKEN>"
+```bash
+curl "https://<YOUR_WORKER_URL>/notify/Deploy/Build+v1.4+complete?token=<AUTH_TOKEN>"
 ```
 
-### 3. Direct Topic ID Override
-```bash
-curl -X POST "https://<WORKER_URL>/notify" \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: <AUTH_TOKEN>" \
-  -d '{
-    "message": "Direct message to thread 42",
-    "topic": 42
-  }'
-```
+### Piping terminal output
 
-### 4. Piping Terminal CLI Logs
 ```bash
-echo "Backup finished successfully" | curl -X POST "https://<WORKER_URL>/notify?topic=backups&title=Nightly+Cron" \
+echo "Backup finished successfully" | curl -X POST \
+  "https://<YOUR_WORKER_URL>/notify?topic=backups&title=Nightly+Cron" \
   -H "x-api-key: <AUTH_TOKEN>" \
   --data-binary @-
 ```
 
-### 5. Quick Ping via GET Request
+### Raw webhooks
+
+If a service sends payloads without a standard message property, the gateway recovers the raw body and queries into the `catchall` topic inside a collapsible code block.
+
+## Payload reference
+
+| Field | Type | Description |
+|---|---|---|
+| `message` | string | Alert body text. Required. Supports markdown. |
+| `title` | string | Alert header title. Optional. |
+| `topic` | string or number | Destination topic name or numeric thread ID. Defaults to General. |
+| `silent` | boolean | Disables notification sound when true. |
+
+## Telegram bot commands
+
+Send these commands directly in your Telegram group:
+
+| Command | Description | Example |
+|---|---|---|
+| `/help` or `/start` | Displays interactive help menu | `/help` |
+| `/docs` or `/api` | Shows curl examples and payload reference | `/docs` |
+| `/id` | Displays chat ID, user ID, and current thread ID | `/id` |
+| `/status` | Shows operational health, topic counts, and mute state | `/status` |
+| `/mute <topic> [time]` | Mutes alerts for a topic, for example 1h, 4h, 24h, 7d | `/mute deploy 2h` |
+| `/unmute <topic>` | Restores notification sound for a topic | `/unmute deploy` |
+| `/test <topic>` | Sends an end-to-end test alert to a topic | `/test deploy` |
+| `/settopic <name>` | Binds the current forum thread to a topic name | `/settopic deploy` |
+| `/topics` | Lists all mapped topics and thread IDs | `/topics` |
+| `/token ephemeral [time]` | Generates a temporary token stored in KV | `/token ephemeral 24h ci-runner` |
+| `/token permanent [label]` | Generates a permanent API token | `/token permanent backup-server` |
+| `/tokens` | Lists active tokens and expiration times | `/tokens` |
+| `/revoke <token>` | Revokes an active token | `/revoke tg_perm_...` |
+
+Management commands are restricted to group creators, administrators, or users listed in `ADMIN_USER_ID`.
+
+## Shell helper function
+
+Add this function to your `~/.bashrc` or `~/.zshrc`:
+
 ```bash
-curl "https://<WORKER_URL>/notify?token=<AUTH_TOKEN>&topic=health&title=Ping&message=All+systems+operational"
-```
-
-### 6. Catch-All Structural Recovery (Third-party / Raw Webhooks)
-If a third-party service (e.g. Stripe, GitHub, raw JSON) sends a payload without a standard `message` field:
-```bash
-curl -X POST "https://<WORKER_URL>/notify" \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: <AUTH_TOKEN>" \
-  -d '{
-    "event": "charge.succeeded",
-    "data": { "amount": 9900, "currency": "usd" }
-  }'
-```
-The gateway catches it, formats the raw query and JSON body inside a code block, and posts it to the **`catchall`** topic.
-
-### 7. Unauthenticated Catch-All
-If sent without an auth token:
-```bash
-curl -X POST "https://<WORKER_URL>/notify" \
-  -H "Content-Type: application/json" \
-  -d '{ "message": "Unknown webhook ping" }'
-```
-Automatically routed to the **`unknown`** topic, muted silently, and tagged with `🔓 Unverified Source`.
-
----
-
-## 🐚 Shell Helper Function (`notify()`)
-
-Add to `~/.bashrc` or `~/.zshrc`:
-
-```bash
-# Personal Notification Gateway Helper
 notify() {
   local GATEWAY_URL="https://<YOUR_WORKER_URL>"
   local AUTH_TOKEN="<YOUR_TOKEN>"
@@ -172,86 +209,29 @@ notify() {
 }
 ```
 
----
+## Configuration reference
 
-## 🛠️ Setup & Deployment
+Set these optional variables under `[vars]` in `wrangler.toml`:
 
-### 1. Create Cloudflare KV Namespace
-```bash
-npx wrangler kv:namespace create GATEWAY_KV
-npx wrangler kv:namespace create GATEWAY_KV --preview
-```
-Add the output IDs to your `wrangler.toml`.
-
-### 2. Configure Worker Secrets
-```bash
-# Telegram Bot Token from @BotFather
-npx wrangler secret put TELEGRAM_BOT_TOKEN
-
-# Supergroup Chat ID (e.g. -100xxxxxxxxxx)
-npx wrangler secret put TELEGRAM_CHAT_ID
-
-# Master Auth Token for API authentication
-npx wrangler secret put AUTH_TOKEN
-
-# Mandatory Webhook Secret Token for Telegram Bot Commands (SEC-01)
-# Generate any random alphanumeric string (e.g. openssl rand -hex 24)
-npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
-```
-
-### 3. Deploy to Cloudflare Workers
-```bash
-npm run deploy
-```
-
-### 4. Register Telegram Webhook (1-Click)
-Once deployed, activate your bot commands (`/help`, `/token`, `/settopic`, etc.) by registering the webhook:
-```bash
-curl "https://<WORKER_URL>/setup-webhook?token=<AUTH_TOKEN>"
-```
-*(Or open `https://<WORKER_URL>/setup-webhook?token=<AUTH_TOKEN>` in your browser).*
-
-> [!IMPORTANT]
-> The setup route will securely register your `TELEGRAM_WEBHOOK_SECRET` with Telegram. From that moment on, Telegram attaches the secret header to every update, and any webhook request without the exact secret is strictly blocked with `401 Unauthorized`.
-
----
-
-## 🤖 Telegram Bot Commands
-
-Once the webhook is registered, you can manage the gateway directly inside Telegram:
-
-| Command | Description | Example |
+| Variable | Description | Default |
 |---|---|---|
-| `/help` or `/start` | Displays interactive help menu with all commands | `/help` |
-| `/docs` or `/api` | Interactive API and webhook payload usage documentation | `/docs` |
-| `/id` | Diagnostic info: chat ID, user ID, current topic ID | `/id` |
-| `/status` or `/health` | Gateway operational health, mapped topics, and tokens | `/status` |
-| `/mute [topic] [duration]` | Mutes alerts for a topic in KV (e.g. 1h, 4h, 24h, 7d) | `/mute deploy 2h` |
-| `/unmute <topic>` | Resumes loud notification delivery for a topic | `/unmute deploy` |
-| `/test [topic]` | Dispatches end-to-end verification ping to topic | `/test deploy` |
-| `/settopic <name>` | Binds the current forum topic to `<name>` in KV | `/settopic prod-deploy` |
-| `/topics` | Lists all mapped forum topics | `/topics` |
-| `/token ephemeral` | Generates a time-limited token stored in KV | `/token ephemeral 24h ci-runner` |
-| `/token permanent` | Generates a persistent API token | `/token permanent backup-server` |
-| `/tokens` | Lists active tokens, labels, and expiration times | `/tokens` |
-| `/revoke <token>` | Instantly revokes an active token | `/revoke tg_perm_...` |
+| `ADMIN_USER_ID` | Comma separated Telegram user IDs allowed to manage tokens and topics | Unset, defaults to group admins |
+| `QUIET_HOURS_START` | Hour of day when quiet hours start, from 0 to 23 | Unset |
+| `QUIET_HOURS_END` | Hour of day when quiet hours end, from 0 to 23 | Unset |
+| `TIMEZONE` | IANA timezone name, for example America/New_York or UTC | UTC |
+| `UNKNOWN_TOPIC_ID` | Numeric thread ID override for unauthenticated messages | Auto-created topic |
+| `CATCHALL_TOPIC_ID` | Numeric thread ID override for raw structural recovery | Auto-created topic |
 
-> [!NOTE]
-> Bot management commands (`/token`, `/settopic`, `/revoke`, `/mute`, `/unmute`, `/test`, `/status`) are protected: only group creators/administrators (or IDs listed in `ADMIN_USER_ID`) can execute them.
-
----
-
-## 🧪 Testing
+## Testing
 
 ```bash
-# Run unit & integration test suite (Vitest)
-npm run test
+# Run unit and integration tests
+npm test
 
-# TypeScript typechecking
+# Run TypeScript type check
 npm run build
 ```
 
----
+## License
 
-## 📄 License
 Apache-2.0
