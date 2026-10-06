@@ -1,7 +1,7 @@
 {
   "name": "telegram-alerts",
   "version": "1.0.0",
-  "description": "Production-ready Personal Notification Gateway on Cloudflare Workers with Telegram Forum Topics",
+  "description": "Serverless notification gateway on Cloudflare Workers & Hono. Dispatches webhooks & alerts to auto-created Telegram forum topics with zero server costs.",
   "main": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev",
@@ -14,10 +14,19 @@
   "keywords": [
     "cloudflare-workers",
     "telegram",
-    "notifications",
+    "telegram-bot",
+    "telegram-notifications",
     "alerts",
+    "alerting",
+    "notification-service",
+    "webhook",
+    "webhooks",
+    "serverless",
     "hono",
-    "serverless"
+    "typescript",
+    "monitoring",
+    "devops",
+    "forum-topics"
   ],
   "author": "Udit Rajput",
   "license": "Apache-2.0",
