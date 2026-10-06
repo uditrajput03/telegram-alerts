@@ -1,0 +1,31 @@
+name = "tg"
+main = "src/index.ts"
+compatibility_date = "2025-02-24"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Optional override for the unauthenticated 'unknown' topic ID (auto-created if unset)
+# UNKNOWN_TOPIC_ID = "99"
+
+# Optional override for the raw 'catchall' topic ID (auto-created if unset)
+# CATCHALL_TOPIC_ID = "88"
+
+# Restrict bot token management (/token, /settopic) to specific Telegram User ID(s)
+# ADMIN_USER_ID = "123456789"
+
+# Optional Quiet Hours (Disabled by default)
+# QUIET_HOURS_START = "23"
+# QUIET_HOURS_END = "07"
+# TIMEZONE = "UTC"
+
+# Cloudflare KV Namespace for dynamic topics and bot-generated tokens
+[[kv_namespaces]]
+binding = "GATEWAY_KV"
+id = "49ac6dd416f043d8a7c7d790603b5cd3"
+preview_id = "0da01bdaa04b4ec6b7769c7484c8edd8"
+
+# Secrets to configure via `wrangler secret put <KEY>`:
+# - TELEGRAM_BOT_TOKEN: Bot token from @BotFather
+# - TELEGRAM_CHAT_ID: Telegram Supergroup Chat ID (-100xxxxxxxxxx)
+# - AUTH_TOKEN: Master static authentication token
+# - TELEGRAM_WEBHOOK_SECRET: Mandatory secret token for Telegram bot webhook commands (SEC-01)
