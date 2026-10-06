@@ -2,6 +2,8 @@
 
 A serverless gateway running on Cloudflare Workers and Hono. It accepts alerts from scripts, servers, webhooks, and command line tools, and routes them into Telegram supergroup forum topics.
 
+📖 **[Read the Documentation](https://uditrajput03.github.io/telegram-alerts/)**
+
 ## Features
 
 * **Dynamic forum topics.** Pass a topic name in your request. The gateway checks Cloudflare KV for the topic thread, creates the topic on Telegram if it does not exist, and caches the thread ID. If a topic is deleted in Telegram, the gateway recreates it automatically.

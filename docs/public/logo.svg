@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="tg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2AABEE" />
+      <stop offset="100%" stop-color="#229ED9" />
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+  </defs>
+  <!-- Background Rounded Rect -->
+  <rect width="100" height="100" rx="24" fill="url(#tg-grad)" />
+  <!-- Paper Plane / Telegram Icon -->
+  <path
+    d="M23 48.5 L73 28 L59 73 L46.5 60.5 L46.5 70 L40.5 64 L37.5 54 L23 48.5 Z"
+    fill="none"
+  />
+  <path
+    d="M74.8 28.6c-.6-.7-1.6-.9-2.5-.5L22.9 49.3c-1.1.5-1.5 1.7-1 2.7.3.6.9 1 1.6 1.1l14.2 3.6 4.3 13.6c.4 1.2 1.6 1.9 2.8 1.6.6-.2 1.1-.6 1.4-1.1l7.4-8.8 15 11c1 .7 2.3.5 3-.5.3-.4.5-.9.4-1.4l8-47.5c.2-1.1-.5-2.2-1.8-2.5zm-33.6 28l-2.4 7.6 1.9-6.4 24.8-19.4-24.3 18.2zm24.7 7.7l-12.8-9.4 20-15-7.2 24.4z"
+    fill="#ffffff"
+  />
+  <!-- Pulse Notification Dot -->
+  <circle cx="77" cy="24" r="8" fill="#ef4444" stroke="#ffffff" stroke-width="2.5" />
+</svg>
